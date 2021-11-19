@@ -1,0 +1,20 @@
+version: '3'
+services:
+  api:
+    image: 'ooe1/DOCKERREPO:TAG'
+    networks:
+      - traefik-public
+#      - mobilex360network
+#    ports:
+ #     - 7102:7002
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.http.routers.api_prod.rule=Host(`xxx.domain.com`)
+        - traefik.http.routers.api_prod.entrypoints=websecure
+        - traefik.http.routers.api_prod.tls.certresolver=letsencryptresolver
+        - traefik.http.services.api_prod.loadbalancer.server.port=7000
+networks:
+  traefik-public:
+    external: true

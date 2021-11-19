@@ -1,0 +1,83 @@
+version: '3.4'
+
+services:
+  reverse-proxy:
+    image: traefik:latest
+    command:
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.buckets=0.100000, 0.300000, 1.200000, 5.000000"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+      - "--entryPoints.metrics.address=:8082"
+      - "--metrics.prometheus.entryPoint=metrics"
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.swarmMode=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-public"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entryPoints.web.forwardedHeaders.insecure"
+      - "--entryPoints.websecure.forwardedHeaders.insecure" 
+      - "--certificatesresolvers.letsencryptresolver.acme.dnschallenge=true"
+      - "--certificatesresolvers.letsencryptresolver.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.letsencryptresolver.acme.email=MAIL_ADRESS"
+      - "--certificatesresolvers.letsencryptresolver.acme.storage=/var/lib/traefik/acme.json"
+      - "--pilot.token=PILOT_TOKEN_PILOT_TOKEN"
+
+     
+    environment:
+       CLOUDFLARE_EMAIL: "MAIL_ADRESS"
+       CLOUDFLARE_API_KEY: "TOKEN_TOKEN_TOKEN"
+    
+  
+    ports:
+      - target: 80
+        published: 80
+        mode: host
+      - target: 443
+        published: 443
+        mode: host
+
+    volumes:
+      - traefik-certificates2:/var/lib/traefik
+      - traefik-certificates3:/var/lib/traefiksec
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik-public
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.traefik.rule=Host(`xxx.domain.com`)"
+        - "traefik.http.routers.traefik.entrypoints=websecure"
+        - "traefik.http.routers.traefik.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.traefik.service=api@internal"
+        - "traefik.http.services.traefik.loadbalancer.server.port=888" # required by swarm but not used.
+        - "traefik.http.routers.traefik.middlewares=traefik-auth"
+        - "traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$apr1$$rWovMn85$$xHBH46RVVCPW8gGnswkbJ/"
+    
+      # Wildcard cert XAPP
+        - "traefik.http.routers.traefik_xapp.rule=Host(`domain.com`)"
+        - "traefik.http.routers.traefik_xapp.tls.domains[0].main=domain.com"
+        - "traefik.http.routers.traefik_xapp.tls.domains[0].sans=*.domain.com"
+        - "traefik.http.routers.traefik_xapp.tls.certresolver=letsencryptresolver"
+      # xapp biter    
+    
+    
+    
+        - "traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)"
+        - "traefik.http.routers.http-catchall.entrypoints=web"
+        - "traefik.http.routers.http-catchall.middlewares=redirect-to-https@docker"
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    
+volumes:
+  traefik-certificates2:
+  traefik-certificates3:
+  
+networks:
+  traefik-public:
+    external: true
